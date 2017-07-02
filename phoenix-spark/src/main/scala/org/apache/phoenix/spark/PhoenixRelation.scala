@@ -20,13 +20,13 @@ package org.apache.phoenix.spark
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.sources._
 import org.apache.phoenix.util.StringUtil.escapeStringConstant
 import org.apache.phoenix.util.SchemaUtil
 
 case class PhoenixRelation(tableName: String, zkUrl: String, dateAsTimestamp: Boolean = false)(@transient val sqlContext: SQLContext)
-    extends BaseRelation with PrunedFilteredScan {
+    extends BaseRelation with PrunedFilteredScan with InsertableRelation {
 
   /*
     This is the buildScan() implementing Spark's PrunedFilteredScan.
@@ -60,6 +60,13 @@ case class PhoenixRelation(tableName: String, zkUrl: String, dateAsTimestamp: Bo
     ).toDataFrame(sqlContext).schema
   }
 
+  //add insert support
+  override def insert(data: DataFrame, overwrite: Boolean): Unit = {
+      new DataFrameFunctions(
+        data
+      ).saveToPhoenix(tableName, new Configuration(), Some(zkUrl))
+    }
+  
   // Attempt to create Phoenix-accepted WHERE clauses from Spark filters,
   // mostly inspired from Spark SQL JDBCRDD and the couchbase-spark-connector
   private def buildFilter(filters: Array[Filter]): String = {
